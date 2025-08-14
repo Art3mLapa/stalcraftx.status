@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Servers</title>
+    <style>
+        @font-face {
+            font-family: 'Bebas Neue';
+            src: url('/assets/BebasNeue.ttf') format('truetype');
+            font-weight: normal;
+            font-style: normal;
+        }
+        :root {
+            --bg-color: #f5f5f5;
+            --text-color: #000000;
+            --logo-filter: none;
+            --stripe-color: #e0e0e0;
+            --footer-stripe-color: #e0e0e0;
+            --footer-text-color: #a0a0a0;
+        }
+        [data-theme="dark"] {
+            --bg-color: #2c2c2c;
+            --text-color: #ffffff;
+            --logo-filter: brightness(0) invert(1);
+            --stripe-color: #444444;
+            --footer-stripe-color: #444444;
+            --footer-text-color: #ffffff;
+        }
+        body {
+            margin: 0;
+            font-family: 'Bebas Neue', Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .logo-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            padding: 20px 0;
+            position: relative;
+        }
+        .theme-toggle {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #a0a0a0;
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            cursor: pointer;
+            outline: none;
+        }
+        .theme-toggle:hover {
+            background-color: #808080;
+        }
+        .logo {
+            width: 11.5vw; /* Увеличено на 15% с 10vw */
+            max-width: 20vw;
+            min-width: 5vw;
+            height: auto;
+            filter: var(--logo-filter);
+            transition: filter 0.3s ease;
+        }
+        .stripe {
+            width: 100%;
+            height: 2px;
+            background-color: var(--stripe-color);
+        }
+        .online-container {
+            margin: 20px;
+            text-align: center;
+        }
+        .online-value {
+            font-size: 48px;
+            transition: color 0.5s ease;
+        }
+        .online-label {
+            font-size: 24px;
+        }
+        .ping-container {
+            margin: 20px;
+            text-align: center;
+        }
+        .ping-title {
+            font-size: 24px;
+        }
+        .ping-detail {
+            font-size: 16px;
+            margin: 5px 0;
+        }
+        .server-section {
+            margin: 20px 0;
+            text-align: center;
+        }
+        .server-section h3 {
+            font-size: 20px;
+            margin: 10px 0;
+        }
+        .server-list {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
+        .server-item {
+            margin: 5px;
+        }
+        .ping-value {
+            transition: color 0.3s ease;
+        }
+        .ping-value[data-ping="low"] { color: #4bc63b; }
+        .ping-value[data-ping="medium"] { color: #bec63b; }
+        .ping-value[data-ping="high"] { color: #c63b3b; }
+        .footer {
+            width: 100%;
+            margin-top: auto;
+            text-align: center;
+            padding: 10px 0;
+        }
+        .footer-stripe {
+            width: 100%;
+            height: 2px;
+            background-color: var(--footer-stripe-color);
+        }
+        .footer-text {
+            font-size: 14px;
+            color: var(--footer-text-color);
+            margin-top: 5px;
+        }
+        .footer-text a {
+            color: var(--footer-text-color);
+            text-decoration: none;
+        }
+        .footer-text a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <img src="/assets/banner_logo.svg" alt="Game Logo" class="logo">
+        <button class="theme-toggle" onclick="toggleTheme()"></button>
+    </div>
+    <div class="stripe"></div>
+    <div class="online-container">
+        <div class="online-value" id="online">0</div>
+        <div class="online-label">ONLINE (RU)</div>
+    </div>
+    <div class="ping-container" id="nearest-ping"></div>
+    <div class="ping-container" id="all-servers"></div>
+    <div class="footer">
+        <div class="footer-stripe"></div>
+        <div class="footer-text">Made by <a href="https://github.com/Art3mLapa" target="_blank">Art3mLapa</a></div>
+    </div>
+    <script>
+        let currentOnline = 0;
+        let isDarkTheme = false;
+
+        function toggleTheme() {
+            isDarkTheme = !isDarkTheme;
+            document.body.setAttribute('data-theme', isDarkTheme ? 'dark' : '');
+        }
+
+        async function fetchServers() {
+            try {
+                const response = await fetch('/servers');
+                if (!response.ok) throw new Error('Server fetch failed');
+                const serverData = await response.json();
+                const parsedData = JSON.parse(serverData.data);
+                const newOnline = parsedData[0]?.onlineCurrent || 0;
+                animateOnlineCount(newOnline);
+            } catch (error) {
+                document.getElementById('online').innerText = 'Error';
+                console.error('Error fetching servers:', error);
+            }
+        }
+
+        function animateOnlineCount(target) {
+            const element = document.getElementById('online');
+            const difference = target - currentOnline;
+            if (difference === 0) {
+                element.style.color = '#000000';
+                element.innerText = target;
+                return;
+            }
+
+            const duration = 3000;
+            const stepTime = 50;
+            const steps = duration / stepTime;
+            const stepValue = difference / steps;
+            let currentStep = 0;
+
+            element.style.color = difference > 0 ? '#4bc63b' : '#c63b3b';
+
+            const interval = setInterval(() => {
+                currentStep++;
+                const newValue = Math.round(currentOnline + stepValue * currentStep);
+                element.innerText = newValue;
+                if (currentStep >= steps) {
+                    clearInterval(interval);
+                    element.innerText = target;
+                    currentOnline = target;
+                    if (target === currentOnline) {
+                        element.style.color = '#000000';
+                    }
+                }
+            }, stepTime);
+        }
+
+        async function fetchPing() {
+            try {
+                const response = await fetch('/ping');
+                if (!response.ok) throw new Error('Ping fetch failed');
+                const pingData = await response.json();
+                displayNearestServer(pingData);
+                displayAllServers(pingData);
+            } catch (error) {
+                document.getElementById('nearest-ping').innerText = 'Error fetching ping data';
+                document.getElementById('all-servers').innerText = 'Error fetching ping data';
+                console.error('Error fetching ping:', error);
+            }
+        }
+
+        function displayNearestServer(data) {
+            const nearest = findNearestServer(data);
+            const container = document.getElementById('nearest-ping');
+            container.innerHTML = `
+                <div class="ping-title">NEAREST SERVER PING</div>
+                <div>${nearest.name}</div>
+                <div class="ping-detail ping-value" data-ping="${getPingColor(nearest.ping)}">${nearest.ping}</div>
+            `;
+        }
+
+        function findNearestServer(data) {
+            let minPing = Infinity;
+            let nearest = null;
+            for (const pool of data.pools) {
+                for (const tunnel of pool.tunnels) {
+                    const pingValue = parsePing(tunnel.ping);
+                    if (pingValue < minPing && pingValue !== null) {
+                        minPing = pingValue;
+                        nearest = { name: tunnel.name, ping: tunnel.ping, city: pool.name };
+                    }
+                }
+            }
+            return nearest || { name: 'N/A', ping: 'Unreachable', city: 'Unknown' };
+        }
+
+        function parsePing(pingStr) {
+            const match = pingStr.match(/(\d+)/);
+            return match ? parseInt(match[0]) : null;
+        }
+
+        function getPingColor(ping) {
+            const pingValue = parsePing(ping);
+            if (pingValue === null) return 'high';
+            if (pingValue < 20) return 'low';
+            if (pingValue < 80) return 'medium';
+            return 'high';
+        }
+
+        function displayAllServers(data) {
+            const container = document.getElementById('all-servers');
+            let html = '';
+            const cities = {};
+            for (const pool of data.pools) {
+                cities[pool.name] = cities[pool.name] || [];
+                cities[pool.name].push(...pool.tunnels);
+            }
+
+            for (const [city, tunnels] of Object.entries(cities)) {
+                html += `<div class="server-section"><h3>${city}</h3><div class="server-list">`;
+                tunnels.forEach(tunnel => {
+                    const pingColor = getPingColor(tunnel.ping);
+                    html += `<div class="server-item">${tunnel.name}<br><span class="ping-detail ping-value" data-ping="${pingColor}">${tunnel.ping}</span></div>`;
+                });
+                html += `</div></div>`;
+            }
+            container.innerHTML = html;
+        }
+
+        fetchServers();
+        fetchPing();
+        setInterval(() => {
+            fetchServers();
+            fetchPing();
+        }, 45000);
+    </script>
+</body>
+</html>
